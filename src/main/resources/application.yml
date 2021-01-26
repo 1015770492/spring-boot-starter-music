@@ -1,0 +1,24 @@
+server:
+  port: ${yumbo.music.service.port}
+yumbo:
+  music:
+    service:
+      netease:
+        server: http://yumbo.top:3000 #配置网易云音乐api的服务器地址
+        account: 18279774965 # 网易云音乐账号
+        password: 666666 # 网易云音乐密码
+        loginType: phone # 登录类型，phone 或者 email 或者 qq
+      qq:
+        server: http://yumbo.top:3300 #配置qq音乐api的服务器地址
+        account: 1015770492 # qq账号
+        password: 666666 # qq密码
+      port: 8888 # 配置服务端口
+      prefix: api # 配置统一api访问前缀
+      limit: 30 # 配置默认返回的条数，各取30条，所以返回值是这个值的2倍
+    task:
+      pool:
+        corePoolSize: 15     #设置核心线程数
+        maxPoolSize: 40     #设置最大线程数
+        keepAliveTime: 300  #设置线程活跃时间（秒）
+        workQueueCapacity: 100 #设置工作队列容量
+        workQueueFair: false  #设置工作队列是否为公平队列

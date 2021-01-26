@@ -1,10 +1,9 @@
-package top.yumbo.music.starter.utils;
+package top.yumbo.music.starter.util;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import top.yumbo.util.music.annotation.MusicService;
-import top.yumbo.util.music.musicImpl.netease.NeteaseCloudMusicInfo;
-import top.yumbo.util.music.musicImpl.qq.QQMusicInfo;
+import top.yumbo.music.starter.annotation.MusicService;
+import top.yumbo.music.starter.entity.netease.NeteaseCloudMusicInfo;
+import top.yumbo.music.starter.entity.qq.QQMusicInfo;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -18,7 +17,16 @@ import java.util.concurrent.*;
 public class BiAsyncRequestUtils {
 
     // 两个请求需要进行异步处理，提供效率
-    private static ExecutorService executorService = YumboThreadExecutorServiceUtils.threadPoolExecutor;
+    private static ExecutorService executorService;
+
+    public static ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    public static void setExecutorService(ExecutorService executorService) {
+        BiAsyncRequestUtils.executorService = executorService;
+    }
+
     /**
      * 得到反射类
      */
@@ -34,26 +42,21 @@ public class BiAsyncRequestUtils {
      * 将所有Method都存起来，方便二次利用，不需要重新获取
      */
     // 保存网易云音乐所有加了MusicService注解的方法（这些方法就是api）
-    final static HashMap<String, Method> NCM_Api_MapMethod = new HashMap<String, Method>() {
-        {
-            saveMethod(this, neteaseCloudMusicInfoClass.getMethods());// 保存所有加了注解的方法
-        }
-    };
+    final static HashMap<String, Method> NCM_Api_MapMethodHashMap = new HashMap<String, Method>();
     // 保存QQ音乐所有加了MusicService注解的方法（这些方法就是api）
-    final static HashMap<String, Method> QQ_Api_MapMethodHashMap = new HashMap<String, Method>() {
-        {
-            saveMethod(this, qqMusicInfoClass.getMethods());
-        }
-    };
+    final static HashMap<String, Method> QQ_Api_MapMethodHashMap = new HashMap<String, Method>();
+    //
+    final static HashMap<String, HashMap<String, Method>> reflectClassMap = new HashMap<String, HashMap<String, Method>>();
+
     /**
      * 策略模式，根据字符串得到对应的Api的Map
      */
-    final static HashMap<String, HashMap<String, Method>> reflectClassMap = new HashMap<String, HashMap<String, Method>>() {
-        {
-            put("netease", NCM_Api_MapMethod);// 目的是把所有api通过这个map获取到所有反射的方法，有策略模式的味道
-            put("qq", QQ_Api_MapMethodHashMap);
-        }
-    };
+    static {
+        saveMethod(QQ_Api_MapMethodHashMap, qqMusicInfoClass.getMethods());
+        saveMethod(NCM_Api_MapMethodHashMap, neteaseCloudMusicInfoClass.getMethods());// 保存所有加了注解的方法
+        reflectClassMap.put("netease", NCM_Api_MapMethodHashMap);// 目的是把所有api通过这个map获取到所有反射的方法，有策略模式的味道
+        reflectClassMap.put("qq", QQ_Api_MapMethodHashMap);
+    }
 
 
     /**
@@ -84,12 +87,13 @@ public class BiAsyncRequestUtils {
      * @param qqMusicParameter      qq音乐请求需要的json参数
      * @return {"netease":网易云音乐的数据,"qq":qq音乐的数据}    netease表示来自网易云api、qq表示来自qq音乐
      */
-    public static JSONObject invokeMethod(String neteaseRelativeUrl, JSONObject neteaseMusicParameter, String qqMusicRelativeUrl, JSONObject qqMusicParameter) {
-
+    public static JSONObject invokeMethod(String neteaseRelativeUrl, JSONObject neteaseMusicParameter,
+                                          String qqMusicRelativeUrl, JSONObject qqMusicParameter) {
         // 异步调用网易云音乐api，与后面的qq音乐进行异步组合任务
         CompletableFuture<JSONObject> neteaseCloudMusicFuture = CompletableFuture.supplyAsync(
                 () -> doInvoke("netease", ncmInstance, neteaseRelativeUrl, neteaseMusicParameter)// 通过策略模式调用对应的方法传入对应的参数，将返回的json数据返回
                 , executorService);
+
         // 异步调用qq音乐api
         CompletableFuture<JSONObject> qqMusicFuture = CompletableFuture.supplyAsync(
                 () -> doInvoke("qq", qqmInstance, qqMusicRelativeUrl, qqMusicParameter)
@@ -123,15 +127,23 @@ public class BiAsyncRequestUtils {
         return jsonObject;
     }
 
+    public static JSONObject doInvoke(String serverProvider, String relativeUrl, JSONObject parameter) {
+        return doInvoke(serverProvider, getInstance(serverProvider), relativeUrl, parameter);// 调用对应的服务商的api
+    }
+
     /**
      * @param serverProvider 值为：netease 或者 qq 表示调用的是哪一个api
      * @param relativeUrl    请求的相对路径
      * @param parameter      请求需要带的参数
      * @return json类型的结果
      */
-    private static JSONObject doInvoke(String serverProvider, Object instance, String relativeUrl, JSONObject parameter) {
+    public static JSONObject doInvoke(String serverProvider, Object instance, String relativeUrl, JSONObject parameter) {
         JSONObject result = null;
         try {
+            System.out.println(serverProvider);
+            System.out.println(relativeUrl);
+            System.out.println(instance.toString());
+            System.out.println(parameter);
             result = (JSONObject) reflectClassMap.get(serverProvider).get(relativeUrl).invoke(instance, parameter);// 网易云音乐的部分直接使用;
         } catch (IllegalAccessException e) {
             e.printStackTrace();
@@ -141,18 +153,20 @@ public class BiAsyncRequestUtils {
         return result;
     }
 
+    private static Object getInstance(String serverProvider) {
+        return serverProvider.equals("qq") ? qqmInstance : ncmInstance;
+    }
 
     /**
      * 反射方式获取到实例
      *
-     * @param obj         反射类
      * @param constructor 构造方法
      * @return 反射得到的实例对象
      */
-    private static Object getInstance(Object obj, Constructor<?> constructor) {
+    private static Object getInstance(Constructor<?> constructor) {
         if (constructor.getParameterCount() == 0) { // 找到无参的那个构造方法
             try {
-                obj = constructor.newInstance();
+                return constructor.newInstance();
             } catch (InstantiationException e) {
                 e.printStackTrace();
             } catch (IllegalAccessException e) {
@@ -161,7 +175,7 @@ public class BiAsyncRequestUtils {
                 e.printStackTrace();
             }
         }
-        return obj;
+        return null;
     }
 
     /**
@@ -174,7 +188,10 @@ public class BiAsyncRequestUtils {
     private static Object getNCMInstance(Class<NeteaseCloudMusicInfo> neteaseCloudMusicInfoClass) {
         Object ncm = null;// 反射得到的网易云音乐实例
         for (Constructor<?> constructor : neteaseCloudMusicInfoClass.getDeclaredConstructors()) {
-            ncm = getInstance(ncm, constructor);
+            ncm = getInstance(constructor);
+            if (ncm != null) {
+                break;
+            }
         }
         return ncm;
     }
@@ -189,7 +206,10 @@ public class BiAsyncRequestUtils {
     private static Object getQQMInstance(Class<QQMusicInfo> qqMusicInfoClass) {
         Object qqm = null;// 反射得到的qq音乐实例
         for (Constructor<?> constructor : qqMusicInfoClass.getDeclaredConstructors()) {
-            qqm = getInstance(qqm, constructor);
+            qqm = getInstance(constructor);
+            if (qqm != null) {
+                break;
+            }
         }
         return qqm;
     }

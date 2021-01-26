@@ -1,4 +1,4 @@
-package top.yumbo.music.starter.entity.type;
+package top.yumbo.music.starter.entity.yumboEnum;
 
 import java.util.HashMap;
 
@@ -11,7 +11,7 @@ import java.util.HashMap;
  */
 public enum SearchTypeEnum {
     SINGLE(1), ALBUM(10), SINGER(100), SONG_LIST(1000), USER(1002), MV(1004), LYRICS(1006), FM(1009), VIDEO(1014), COMPLEX(1018);
-    Integer type;// 搜索类型
+    public Integer type;// 搜索类型
     public static HashMap<SearchTypeEnum, Integer> mapQQType = new HashMap<>();// 映射qq音乐的搜索类型
     public static HashMap<Integer,SearchTypeEnum> neteaseSearchType=new HashMap<>();
 
@@ -20,7 +20,7 @@ public enum SearchTypeEnum {
     }
 
     static {
-        neteaseSearchType.put(1,SINGLE);
+        neteaseSearchType.put(1,SINGLE);// 网易云音乐的单曲值是1
         neteaseSearchType.put(10,ALBUM);
         neteaseSearchType.put(100,SINGER);
         neteaseSearchType.put(1000,SONG_LIST);
@@ -30,7 +30,7 @@ public enum SearchTypeEnum {
         neteaseSearchType.put(1009,FM);
         neteaseSearchType.put(1014,VIDEO);
         neteaseSearchType.put(1018,COMPLEX);
-        mapQQType.put(SINGLE, 0);
+        mapQQType.put(SINGLE, 0);// qq音乐单曲对应的值是0
         mapQQType.put(SONG_LIST, 2);
         mapQQType.put(LYRICS, 7);
         mapQQType.put(ALBUM, 8);
